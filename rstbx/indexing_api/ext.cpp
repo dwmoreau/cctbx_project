@@ -2,6 +2,7 @@
 
 #include <boost/python.hpp>
 #include <rstbx/indexing_api/indexing_api.h>
+#include <rstbx/indexing_api/sampling.h>
 
 
 using namespace boost::python;
@@ -193,6 +194,11 @@ BOOST_PYTHON_MODULE(rstbx_indexing_api_ext)
 {
 
    def("cpp_absence_test",cpp_absence_test);
+
+   def("restrict_target_angles_to_quick_winners",
+       restrict_target_angles_to_quick_winners,
+       (arg("angles"),arg("quick_sampling"),
+        arg("second_round_sampling"),arg("quick_grid")));
 
    class_<dps_extended, bases<rstbx::dps_core> >("dps_extended",init< >())
      .def("getData",&dps_extended::getData)
