@@ -3,7 +3,8 @@ from six.moves import range
 import math
 from rstbx.array_family import flex
 from rstbx.dps_core import Direction
-from annlib_ext import AnnAdaptor
+from rstbx.indexing_api import restrict_target_angles_to_quick_winners as \
+  cpp_restrict_target_angles_to_quick_winners
 from rstbx.dps_core import sampling
 from rstbx.dps_core import Direction, directional_show
 #from libtbx.development.timers import Timer
@@ -157,38 +158,11 @@ class HemisphereSampler(SimpleSampler):
     # the quick_sampling winners from the first round of testing.
     # in the second round, restrict the calculation of FFTs to those directions
 
-    self.restricted = flex.Direction()
-    target = flex.double()
-    for iz in self.angles:
-      # fairly inefficient in Python; expect big improvement in C++
-      v = iz.dvec
-      target.append(v[0]);target.append(v[1]);target.append(v[2]);
-    kn = int(2 *self.second_round_sampling)
-
-    #construct k-d tree for the reference set
-    A = AnnAdaptor(data = target, dim = 3, k = kn)
-
-    query = flex.double()
-    for j in quick_sampling:
-      v = j.dvec
-      query.append(v[0]);query.append(v[1]); query.append(v[2]);
-      if abs((math.pi/2.) - j.psi) < 0.0001: #take care of equatorial boundary
-        query.append(-v[0]);query.append(-v[1]); query.append(-v[2]);
-
-    A.query(query) #find nearest neighbors of query points
-    neighbors = flex.sqrt(A.distances)
-    neighborid = A.nn
-
-    accept_flag = flex.bool(len(self.angles))
-    for idx in range(len(neighbors)):
-      # use small angle approximation to test if target is within desired radius
-      if neighbors[idx] < self.quick_grid:
-        accept_flag[neighborid[idx]] = True
-
-    #go through all of the original target angles
-    for iz in range(len(self.angles)):
-      if accept_flag[iz]:
-        self.restricted.append(self.angles[iz])
+    self.restricted = cpp_restrict_target_angles_to_quick_winners(
+      angles = self.angles,
+      quick_sampling = quick_sampling,
+      second_round_sampling = self.second_round_sampling,
+      quick_grid = self.quick_grid)
 
     self.angles = self.restricted
 
