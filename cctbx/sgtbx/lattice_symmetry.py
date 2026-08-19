@@ -21,7 +21,8 @@ class metric_subgroups:
         max_delta,
         enforce_max_delta_for_generated_two_folds=True,
         bravais_types_only=True,
-        best_monoclinic_beta=True):
+        best_monoclinic_beta=True,
+        target_bravais=None):
     adopt_init_args(self,locals())
     self.result_groups = []
 
@@ -58,9 +59,15 @@ class metric_subgroups:
       sort_values.append(order_z*1000+space_group_number)
     perm = flex.sort_permutation(sort_values, True)
 
+    # Subclasses may define their own __init__ without this argument.
+    target_bravais = getattr(self, "target_bravais", None)
     for i_subgr in perm:
       acentric_subgroup = subgrs[i_subgr]
       acentric_supergroup = metric_supergroup(acentric_subgroup)
+      if (target_bravais is not None
+          and str(bravais_types.bravais_lattice(sgtbx.space_group_info(
+                group=acentric_supergroup).type().number())) != target_bravais):
+        continue
       # Add centre of inversion to acentric lattice symmetry
       centric_group = sgtbx.space_group(acentric_subgroup)
       centric_group.expand_inv(sgtbx.tr_vec((0,0,0)))

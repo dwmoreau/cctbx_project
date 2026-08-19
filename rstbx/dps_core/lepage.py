@@ -64,7 +64,7 @@ class iotbx_converter(metric_subgroups,list):
 
  def __init__(self,unit_cell,max_delta,bravais_types_only=True,
     space_group_symbol="P 1",force_minimum=False,best_monoclinic_beta=True,
-    interest_focus="metric_symmetry",sort=True):
+    interest_focus="metric_symmetry",sort=True,target_bravais=None):
     # with regard to "force_minimum": when autoindexing, the orientation
     # matrix may be derived from comparison to a previously indexed case;
     # the setting may be non-standard; therefore we do not want to
@@ -82,7 +82,8 @@ class iotbx_converter(metric_subgroups,list):
                        bravais_types_only=bravais_types_only,
                        force_minimum=force_minimum,
                        best_monoclinic_beta=best_monoclinic_beta,
-                       interest_focus=interest_focus)
+                       interest_focus=interest_focus,
+                       target_bravais=target_bravais)
 
   for subgroup in self.result_groups:
     # required keys for subgroup:

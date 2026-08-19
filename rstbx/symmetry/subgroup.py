@@ -24,7 +24,8 @@ class metric_subgroups(base_subgroups):
         enforce_max_delta_for_generated_two_folds=True,
         bravais_types_only=True,force_minimum=False,
         best_monoclinic_beta=True,
-        interest_focus="metric_symmetry"):
+        interest_focus="metric_symmetry",
+        target_bravais=None):
     adopt_init_args(self,locals())
     self.parse_reference()
     self.result_groups = []
