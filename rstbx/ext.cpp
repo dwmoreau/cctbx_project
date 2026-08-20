@@ -260,9 +260,14 @@ namespace boost_python { namespace {
                                 arg("F0_cutoff"))))
       .def_readonly("pmin",&Directional_FFT::pmin)
       .def_readonly("delta_p",&Directional_FFT::delta_p)
+      .def_readonly("m",&Directional_FFT::m)
       .def_readonly("fft_result",&Directional_FFT::fft_result)
+      .def("power_spectrum",&Directional_FFT::power_spectrum)
       .def("kval",&Directional_FFT::kval)
       .def("kmax",&Directional_FFT::kmax)
+      .def("kval0",&Directional_FFT::kval0)
+      .def("kval2",&Directional_FFT::kval2)
+      .def("kval3",&Directional_FFT::kval3)
    ;
 
     class_<SimpleSamplerTool >("SimpleSamplerTool", init<const double &>())
