@@ -98,10 +98,7 @@ def engine(xyzdata,amax):
   return ai
 
 def assert_agrees(direction,transform,context):
-  """Require a Direction and a directly built transform to agree exactly.
-
-  The power spectrum is compared too: it is the whole transform output seen
-  through a magnitude, so it pins far more than the five scalars do."""
+  """Require a Direction and a directly built transform to agree exactly."""
   for name,got,expected in (
       ("kval",  direction.kval,    transform.kval()),
       ("kval0", direction.kval0,   transform.kval0()),
@@ -114,7 +111,6 @@ def assert_agrees(direction,transform,context):
       "%s: %s %r != %r"%(name,context,got,expected)
   assert direction.kmax == transform.kmax(), context
   assert direction.m == transform.m, context
-  assert same_double_array(direction.getff(),transform.power_spectrum()), context
 
 def random_spots(count,seed):
   """Reciprocal-space vectors with no lattice, for a spread of transform sizes."""
@@ -197,6 +193,23 @@ def exercise_python_reference():
     assert same_complex_array(transform.fft_result,
                               flex.complex_double(reference["bins"]))
 
+def assert_is_first_maximum(transform,spectrum,context):
+  """Require kmax to be the first channel carrying the largest magnitude.
+
+  kval() scans squared magnitudes and falls back to std::abs only near the
+  running maximum, so this is where that fallback is pinned: on an exact tie
+  the earliest channel has to win, exactly as a scan of the spectrum itself
+  with a strict > would give."""
+  kmax = transform.kmax()
+  best = 0.0
+  first = 0
+  for k in range(F0_CUTOFF,spectrum.size()):
+    if spectrum[k] > best:
+      best = spectrum[k]
+      first = k
+  assert same_double(transform.kval(),best), context
+  assert kmax == first, "%s: kmax %d != %d"%(context,kmax,first)
+
 def exercise_kval_is_the_spectrum_maximum():
   """kval, kval0, kval2 and kval3 must stay the power spectrum's own values."""
   xyzdata = random_spots(200,seed=13)
@@ -208,15 +221,44 @@ def exercise_kval_is_the_spectrum_maximum():
     spectrum = transform.power_spectrum()
     kmax = transform.kmax()
     assert kmax >= F0_CUTOFF or transform.kval() == 0.0
-    best = 0.0
-    for k in range(F0_CUTOFF,spectrum.size()):
-      best = max(best,spectrum[k])
-    assert same_double(transform.kval(),best)
+    assert_is_first_maximum(transform,spectrum,"direction %r"%(dvec,))
     assert same_double(transform.kval0(),spectrum[0])
     assert same_double(transform.kval2(),
                        spectrum[kmax*2] if kmax*2 < spectrum.size() else 0.0)
     assert same_double(transform.kval3(),
                        spectrum[kmax*3] if kmax*3 < spectrum.size() else 0.0)
+
+def exercise_tied_channels():
+  """A spectrum with repeated magnitudes must resolve to the first of them.
+
+  A histogram that is symmetric about its centre transforms to a spectrum with
+  exactly equal channels, which is the case where a scan of squared magnitudes
+  could pick a different channel from a scan of std::abs."""
+  step = 1.0/64
+  xyzdata = flex.vec3_double([(0.0,0.0,i*step) for i in range(64)])
+  ai = engine(xyzdata,120.0)
+  for dvec in [(0.,0.,1.)] + random_directions(8,seed=41):
+    transform = fresh_transform(dvec,xyzdata,ai.granularity,120.0)
+    assert_is_first_maximum(transform,transform.power_spectrum(),
+                            "tied %r"%(dvec,))
+    assert_agrees(ai.fft_result(Direction(dvec)),transform,"tied %r"%(dvec,))
+
+def exercise_hot_path_leaves_ff_unset():
+  """dps_core.fft_result does not build the power spectrum.
+
+  Nothing on that path reads Direction.ff, and building it is the largest
+  remaining cost per direction, so the binding asks for the scalars only. The
+  spectrum is still produced, correctly, by anyone who asks the transform."""
+  xyzdata = random_spots(120,seed=19)
+  ai = engine(xyzdata,200.0)
+  for dvec in random_directions(6,seed=43):
+    assert ai.fft_result(Direction(dvec)).getff().size() == 0
+    transform = fresh_transform(dvec,xyzdata,ai.granularity,200.0)
+    reference = python_reference(dvec,xyzdata,ai.granularity,200.0)
+    spectrum = transform.power_spectrum()
+    assert spectrum.size() == len(reference["spectrum"])
+    for k in range(spectrum.size()):
+      assert approx_equal(spectrum[k],reference["spectrum"][k],eps=1e-9)
 
 def exercise_degenerate_cases():
   """The smallest inputs the class accepts, on a workspace and without one."""
@@ -271,6 +313,8 @@ def run():
   distinct = exercise_workspace_reuse()
   exercise_python_reference()
   exercise_kval_is_the_spectrum_maximum()
+  exercise_tied_channels()
+  exercise_hot_path_leaves_ff_unset()
   exercise_degenerate_cases()
   exercise_lattice_recovery()
   print("OK (%d distinct transform lengths exercised)"%distinct)

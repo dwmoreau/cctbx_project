@@ -187,7 +187,7 @@ namespace boost_python { namespace {
   Direction
   fft_result(dps_core& ai,Direction& angle){
       fftptr dfft( ai.fft_factory(angle) );
-      angle.extract_directional_properties(dfft,true);
+      angle.extract_directional_properties(dfft,false);
       return angle;
   }
 

@@ -77,15 +77,30 @@ rstbx::Directional_FFT::kmax() {
       return p_kmax;
 }
 
+// Relative width of the band below the running maximum within which the
+// squared magnitude cannot be trusted to order two channels. A gap wider than
+// this in the squares is wider than the rounding of std::abs by a factor of
+// several hundred.
+static const double kval_tie_margin = 1.0e-13;
+
 double
 rstbx::Directional_FFT::kval() {
       if (!has_kval) {
         p_kmax = 0;
         p_kval = 0.0;
-        power_spectrum();
-        scitbx::af::ref<double> ps(pspectrum.begin(),pspectrum.size());
-        for (sztype k = F0_specific_cutoff; k<ps.size(); ++k){
-          if ( ps[k] > p_kval ) { p_kval=ps[k]; p_kmax=k;}
+        double p_square = 0.0;
+        std::complex<double>* resptr = fft_result.begin();
+        for (sztype k = F0_specific_cutoff; k<fft_n_complex; ++k){
+          double re = resptr[k].real();
+          double im = resptr[k].imag();
+          double square = re*re + im*im;
+          // The squared magnitude orders the channels everywhere except within
+          // a few ulps of the running maximum, where it can disagree with
+          // std::abs. Those channels, and only those, are compared on std::abs.
+          if ( square >= p_square * (1.0 - kval_tie_margin) ) {
+            double value = std::abs(resptr[k]);
+            if ( value > p_kval ) { p_kval=value; p_square=square; p_kmax=k;}
+          }
         }
         has_kval = true;
       }
@@ -94,24 +109,24 @@ rstbx::Directional_FFT::kval() {
 
 double
 rstbx::Directional_FFT::kval0() {
-      if (!has_kval) { kval(); }
-      scitbx::af::ref<double> ps(pspectrum.begin(),pspectrum.size());
-      { return ps[0]; }
+      return std::abs(fft_result.begin()[0]);
 }
 
 double
 rstbx::Directional_FFT::kval2() {
       if (!has_kval) { kval(); }
-      scitbx::af::ref<double> ps(pspectrum.begin(),pspectrum.size());
-      if (p_kmax * 2 < ps.size()) { return ps[p_kmax * 2]; }
+      if (p_kmax * 2 < fft_n_complex) {
+        return std::abs(fft_result.begin()[p_kmax * 2]);
+      }
       return 0.0;
 }
 
 double
 rstbx::Directional_FFT::kval3() {
       if (!has_kval) { kval(); }
-      scitbx::af::ref<double> ps(pspectrum.begin(),pspectrum.size());
-      if (p_kmax * 3 < ps.size()) { return ps[p_kmax * 3]; }
+      if (p_kmax * 3 < fft_n_complex) {
+        return std::abs(fft_result.begin()[p_kmax * 3]);
+      }
       return 0.0;
 }
 
