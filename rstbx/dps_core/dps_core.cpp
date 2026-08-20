@@ -18,7 +18,7 @@ dps_fractional_to_miller(const scitbx::vec3<double>& p) {
 }
 
 pd::dps_core::dps_core():
-   granularity(5),outliers_marked(false){}
+   granularity(5),outliers_marked(false),workspace(new fft_workspace()){}
    /*! granularity of the internal projection of observed reciprocal space
       vectors onto the directional axis.  granularity value is a fixed
       parameter of the Rossmann DPS algorithm */
@@ -30,7 +30,8 @@ pd::dps_core::setMaxcell(const double& a){
 
 pd::fftptr
 pd::dps_core::fft_factory(const pd::Direction& angle) const {
-  fftptr rv(new Directional_FFT(angle, xyzdata, granularity, amax));
+  fftptr rv(new Directional_FFT(angle, xyzdata, granularity, amax,
+                                F0_cutoff, workspace.get()));
   return rv;
 }
 

@@ -36,6 +36,8 @@ class dps_core {
   af::shared<Direction> hemisphere_solutions;
   Orientation orientation;
   bool outliers_marked;// Boolean for indicating if outliers have been marked
+  boost::shared_ptr<fft_workspace> workspace;// transform plans and scratch,
+                      // shared by every direction this instance evaluates
  public:
   dps_statuslist status;  // scratch pad for spot status
   dps_statuslist Estatus; // scratch pad for spot status
