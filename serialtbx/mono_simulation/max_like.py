@@ -19,6 +19,9 @@ def logistic(a):
   e = exp(a)
   return e / (1. + e)
 
+def logaddexp(a, b):
+  return max(a, b) + math.log1p(exp(-abs(a - b)))
+
 class minimizer:
   def __init__(self, d_i, psi_i, eta_rad, Deff):
     self.safelog = -1. + math.log(sys.float_info.max)
@@ -100,7 +103,7 @@ class minimizer:
             gradients at the current position
     """
     if self.x[0] > self.safelog or self.x[1] > self.safelog:
-      raise ValueError("max likelihood current parameters outside of math domain %f %f"%(self.x))
+      return self.compute_functional_and_gradients_without_overflow()
     alpha = exp(self.x[0])
     eta = exp(self.x[1])
     #print "alpha",alpha, "eta",eta
@@ -118,14 +121,13 @@ class minimizer:
       B = self.escalate / psi_model
 
       if psi_model > 1e100 or part_psi_model_partP0 > 1e100:
-        from libtbx.utils import Sorry
-        raise Sorry("Model has diverged, cannot continue")
+        return self.compute_functional_and_gradients_without_overflow()
 
       expBarg = B * (psi_i + psi_model)
       expBnegarg = -B * (psi_i - psi_model)
 
       if max(expBarg, expBnegarg) > log(1e100):
-        return self.compute_functional_and_gradients_without_overflow(alpha, eta)
+        return self.compute_functional_and_gradients_without_overflow()
 
       expB = exp(expBarg)
       expBneg = exp(expBnegarg)
@@ -197,23 +199,22 @@ class minimizer:
     return (f, flex.double([partf_partP0,partf_partP1]))
 
 
-  def compute_functional_and_gradients_without_overflow(self, alpha, eta):
-    # The same functional and gradients, with log(1+e^a) and e^a/(1+e^a) in forms that cannot overflow
+  def compute_functional_and_gradients_without_overflow(self):
+    # The same functional and gradients, evaluated in log alpha and log eta so that nothing can overflow
     log_expnu = math.log1p(exp(self.escalate))
     f = 0.
     partf_partP0 = 0.
     partf_partP1 = 0.
     for i in range(self.Nobs):
-      psi_model = (self.d_i[i]*alpha + eta)/2.
-      psi_i = self.psi_i[i]
-      B = self.escalate / psi_model
-      expBarg = B * (psi_i + psi_model)
-      expBnegarg = -B * (psi_i - psi_model)
-      f += log(2. * psi_model) + softplus(expBarg) + softplus(expBnegarg) - 2 * log_expnu
-      zed = self.escalate * psi_i / (psi_model * psi_model)
-      partf_partpsi_model = 1. / psi_model - zed * logistic(expBarg) + zed * logistic(expBnegarg)
-      partf_partP0 += partf_partpsi_model * 0.5 * self.d_i[i] * alpha
-      partf_partP1 += partf_partpsi_model * 0.5 * eta
+      log_d_alpha = log(self.d_i[i]) + self.x[0]
+      log_psi_model = logaddexp(log_d_alpha, self.x[1]) - log(2.)
+      ratio = self.psi_i[i] * exp(-log_psi_model)
+      expBarg = self.escalate * (1. + ratio)
+      expBnegarg = self.escalate * (1. - ratio)
+      f += log(2.) + log_psi_model + softplus(expBarg) + softplus(expBnegarg) - 2 * log_expnu
+      partf_partlog_psi_model = 1. - self.escalate * ratio * (logistic(expBarg) - logistic(expBnegarg))
+      partf_partP0 += partf_partlog_psi_model * logistic(log_d_alpha - self.x[1])
+      partf_partP1 += partf_partlog_psi_model * logistic(self.x[1] - log_d_alpha)
     return (f, flex.double([partf_partP0,partf_partP1]))
 
 
